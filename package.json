@@ -1,0 +1,7 @@
+{
+  "name": "mendpoint-canary-drill",
+  "private": true,
+  "scripts": {
+    "test": "node verify.mjs"
+  }
+}

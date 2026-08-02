@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "service": "mendpoint-canary",
+  "generation": 1,
+  "status": "healthy",
+  "recoveryMarker": "baseline-2026-08-01"
+}
