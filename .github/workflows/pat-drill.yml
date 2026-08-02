@@ -1,0 +1,70 @@
+name: Restricted PAT drill
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Drill action
+        required: true
+        type: choice
+        options:
+          - inject
+          - restore
+
+permissions:
+  contents: read
+
+jobs:
+  drill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ secrets.CANARY_PAT }}
+      REPOSITORY: ${{ github.repository }}
+      DRILL_BRANCH: canary/recovery-drill
+      RECOVERY_TAG: recovery-baseline-2026-08-01
+    steps:
+      - name: Require restricted token
+        run: test -n "$GH_TOKEN"
+
+      - name: Inject controlled failure and open draft pull request
+        if: inputs.action == 'inject'
+        shell: bash
+        run: |
+          set -euo pipefail
+          main_sha="$(gh api "repos/$REPOSITORY/git/ref/heads/main" --jq .object.sha)"
+          gh api --method POST "repos/$REPOSITORY/git/refs" \
+            -f ref="refs/heads/$DRILL_BRANCH" \
+            -f sha="$main_sha"
+
+          current_file_sha="$(gh api "repos/$REPOSITORY/contents/canary-state.json?ref=$DRILL_BRANCH" --jq .sha)"
+          degraded_content="$(printf '%s\n' '{' '  "schemaVersion": 1,' '  "service": "mendpoint-canary",' '  "generation": 2,' '  "status": "degraded",' '  "recoveryMarker": "controlled-failure-2026-08-01"' '}' | base64 -w 0)"
+          gh api --method PUT "repos/$REPOSITORY/contents/canary-state.json" \
+            -f message="Inject controlled canary failure" \
+            -f content="$degraded_content" \
+            -f sha="$current_file_sha" \
+            -f branch="$DRILL_BRANCH"
+
+          gh api --method POST "repos/$REPOSITORY/pulls" \
+            -f title="Canary recovery drill" \
+            -f head="$DRILL_BRANCH" \
+            -f base=main \
+            -F draft=true \
+            -f body="Controlled failure. Do not merge. Restore this branch from the immutable recovery tag."
+
+      - name: Restore draft pull request from immutable recovery tag
+        if: inputs.action == 'restore'
+        shell: bash
+        run: |
+          set -euo pipefail
+          baseline_content="$(gh api "repos/$REPOSITORY/contents/canary-state.json?ref=$RECOVERY_TAG" --jq .content | tr -d '\n')"
+          current_file_sha="$(gh api "repos/$REPOSITORY/contents/canary-state.json?ref=$DRILL_BRANCH" --jq .sha)"
+          gh api --method PUT "repos/$REPOSITORY/contents/canary-state.json" \
+            -f message="Restore canary from immutable baseline" \
+            -f content="$baseline_content" \
+            -f sha="$current_file_sha" \
+            -f branch="$DRILL_BRANCH"
+
+          restored_sha="$(gh api "repos/$REPOSITORY/commits/$DRILL_BRANCH" --jq .sha)"
+          restored_content="$(gh api "repos/$REPOSITORY/contents/canary-state.json?ref=$restored_sha" --jq .content | tr -d '\n')"
+          test "$restored_content" = "$baseline_content"
