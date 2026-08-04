@@ -3,10 +3,5 @@
   "service": "mendpoint-canary",
   "generation": 1,
   "status": "healthy",
-  "recoveryMarker": "baseline-2026-08-01",
-  "drillEvidence": {
-    "delivery": "Mendpoint OctokitGitHubDelivery",
-    "purpose": "Private draft pull request and restore proof",
-    "date": "2026-08-04"
-  }
+  "recoveryMarker": "baseline-2026-08-01"
 }
