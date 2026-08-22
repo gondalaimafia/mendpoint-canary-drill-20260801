@@ -1,4 +1,4 @@
-FROM node:20.19.4-alpine
+FROM node:22.19.4-alpine
 
 WORKDIR /app
 COPY package.json verify.mjs canary-state.json ./
